@@ -22,7 +22,8 @@ class WorkGraphStorage:
         # Update the min work graph
         weight = min(self.get(from_id, to_id).get('total_received', 0),
                      self.get(from_id, to_id).get('total_sent', 0))
-        self.min_work_graph.add_edge(from_id, to_id, weight=weight)
+        if weight > 0:
+            self.min_work_graph.add_edge(from_id, to_id, weight=weight)
 
     def get(self,
             from_id: str,

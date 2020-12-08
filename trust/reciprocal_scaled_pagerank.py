@@ -21,7 +21,7 @@ class ReciprocalScaledPageRank:
     def __init__(self, graph: nx.DiGraph,
                  base_number_of_walks: int = 10,
                  reset_probability: float = 0.1,
-                 alpha: float = 1.0
+                 alpha: float = 2.0
                  ) -> None:
         self.graph = graph
         self.number_random_walks = base_number_of_walks
@@ -52,8 +52,8 @@ class ReciprocalScaledPageRank:
 class WBPPR(ReciprocalScaledPageRank):
 
     def net_contrib(self, node: int) -> float:
-        return min(self.alpha * (self.graph.out_degree(node, weight='weight') + 1)
-                   - self.graph.in_degree(node, weight='weight'), 1000)
+        return min(self.alpha * (self.graph.out_degree(node, weight='weight') / 1000 + 1)
+                   - self.graph.in_degree(node, weight='weight') / 1000, 1000)
 
 
 class SBPPR:

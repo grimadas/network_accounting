@@ -5,18 +5,28 @@ used as a reputation mechanism in P2P networks.
 import networkx as nx
 import numpy as np
 
+import igraph as ig
+
+from typing import Union
+
 
 class BarterCast:
 
-    def __init__(self, graph: nx.Graph) -> None:
+    def __init__(self, graph: Union[nx.Graph, ig.Graph], use_igraph: bool = False) -> None:
         self.graph = graph
+
+        self.use_igraph = use_igraph
 
     def compute(self, seed_node: int, target_node: int) -> float:
         """Compute bartercast score of target node from perspective of seed_node"""
         if seed_node == target_node:
             return 1.0
-        maxflow_seed_target = nx.maximum_flow(self.graph, seed_node, target_node, capacity='weight')[0]
-        maxflow_target_seed = nx.maximum_flow(self.graph, target_node, seed_node, capacity='weight')[0]
+        if self.use_igraph:
+            maxflow_seed_target = self.graph.maxflow_value(seed_node, target_node, capacity='weight')
+            maxflow_target_seed = self.graph.maxflow_value(target_node, seed_node, capacity='weight')
+        else:
+            maxflow_seed_target = nx.maximum_flow(self.graph, seed_node, target_node, capacity='weight')[0]
+            maxflow_target_seed = nx.maximum_flow(self.graph, target_node, seed_node, capacity='weight')[0]
         values = float(np.arctan(maxflow_seed_target - maxflow_target_seed)) / float(0.5 * np.pi)
         return values
 
@@ -53,18 +63,30 @@ class RawBarterCast:
 
 class BoundedBarterCast:
 
-    def __init__(self, graph: nx.DiGraph, alpha: float = 1.0) -> None:
+    def __init__(self, graph: Union[nx.DiGraph, ig.Graph], alpha: float = 1.0, use_igraph: bool = False) -> None:
         self.alpha = alpha
         self.graph = graph
+
+        self.use_igraph = use_igraph
 
         self.scores = {}
 
     def net_contrib(self, node: int) -> float:
-        return min(self.alpha * (self.graph.out_degree(node, weight='weight') + 1)
-                   - self.graph.in_degree(node, weight='weight'), 1000)
+
+        if self.use_igraph:
+            out_deg = self.graph.strength(node, mode='OUT', weights='weight')
+            in_deg = self.graph.strength(node, mode='IN', weights='weight')
+        else:
+            out_deg = self.graph.out_degree(node, weight='weight')
+            in_deg = self.graph.in_degree(node, weight='weight')
+
+        return min(self.alpha * (out_deg + 1) - in_deg, 1000)
 
     def _calc(self, seed_node: int, target_node: int) -> None:
-        val = nx.maximum_flow_value(self.graph, seed_node, target_node, capacity='weight')
+        if self.use_igraph:
+            val = self.graph.maxflow_value(seed_node, target_node, capacity='weight')
+        else:
+            val = nx.maximum_flow_value(self.graph, seed_node, target_node, capacity='weight')
         self.scores[seed_node][target_node] = val
 
     def calc(self, seed_node: int, target_node: int) -> float:
