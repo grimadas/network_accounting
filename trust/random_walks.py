@@ -17,6 +17,11 @@ class BiasStrategies(Enum):
 class RandomWalks:
 
     def __init__(self, graph: nx.DiGraph, alpha: float = 1.0, base_number_random_walks: int = 1000) -> None:
+        """Calcalate the random walks for a given graph.
+        @param graph: The graph to calculate the random walks for.
+        @param alpha: Score value used for the bias.
+        @param base_number_random_walks: The number of random walks to run.
+        """
         self.alpha = alpha
         self.graph = graph
 
@@ -30,6 +35,14 @@ class RandomWalks:
         self.penalties = defaultdict(int)
 
     def bias(self, u: int, v: int, cur_weight: float = None, revert: bool = False) -> float:
+        """Score function for random walk.
+        score = min(alpha * weight(u,v) - weight(v,u), cur_weight). Bounded by zero. 
+        @param u: The current node.
+        @param v: The target neighbor node.
+        @param cur_weight: The current weight to compare against. If none, the weight is set to infinity.
+        @param revert: If true, make a reverse walk (default: False).
+        @return: The score.
+        """
         cur_weight = float('inf') if not cur_weight else cur_weight
         if revert:
             u, v = v, u
@@ -37,6 +50,13 @@ class RandomWalks:
                        - self.graph.get_edge_data(v, u, default={'weight': 0})['weight'], 0), cur_weight)
 
     def weight(self, current_node: int, neigh: int, cur_weight: float = None, revert: bool = False) -> float:
+        """Score function for random walk.
+        score = min(weight(u,v), cur_weight).
+        @param u: The current node.
+        @param v: The target neighbor node.
+        @param cur_weight: The current weight to compare against. If none, the weight is set to infinity.
+        @param revert: If true, make a reverse walk (default: False).
+        @return: The score."""
         cur_weight = float('inf') if not cur_weight else cur_weight
         if revert:
             current_node, neigh = neigh, current_node
@@ -47,6 +67,13 @@ class RandomWalks:
                             neigh: int,
                             cur_weight: float = None,
                             revert: bool = False) -> float:
+        """Score function for random walk. Bounded by the number of hits of the neighbor.
+        score = weight(u,v) if weight(u,v) < penalties(v) else 0.
+        @param u: The current node.
+        @param v: The target neighbor node.
+        @param cur_weight: The current weight to compare against. If none, the weight is set to infinity.
+        @param revert: If true, make a reverse walk (default: False).
+        @return: The score."""
         val = self.base_number_of_random_walks * self.weight(current_node, neigh, cur_weight, revert)
         return 0.0 if self.num_edge_walks[(current_node, neigh)] \
                       + self.base_number_of_random_walks * int(
@@ -102,6 +129,15 @@ class RandomWalks:
                      bias_strategy: BiasStrategies = BiasStrategies.EDGE_WEIGHT,
                      update_weight: bool = False,
                      penalties: Dict[int, int] = None) -> List:
+        """Run a single random walk.
+        @param seed_node: The seed node.
+        @param reset_probability: The probability of resetting the random walk.
+        @param back_random_walk: If true, make a reverse walk (default: False).
+        @param bias_strategy: The strategy to use for the bias. (default: BiasStrategies.EDGE_WEIGHT)
+        @param update_weight: If true, the weight bounds are used. (default: False)
+        @param penalties: The penalties for each node. (default: None)
+        @return: The list of nodes in the random walk.
+        """
         w_func = None
         if bias_strategy == BiasStrategies.ALPHA_DIFF:
             w_func = self.bias
@@ -126,7 +162,15 @@ class RandomWalks:
             update_weight: bool = False,
             penalties: Dict[int, int] = None
             ) -> None:
-
+        """Run multiple random walks.
+        @param seed_node: The seed node.
+        @param num_random_walks: The number of random walks to run.
+        @param reset_probability: The probability of resetting the random walk.
+        @param back_random_walk: If true, make a reverse walk (default: False).
+        @param bias_strategy: The strategy to use for the bias. (default: BiasStrategies.EDGE_WEIGHT)
+        @param update_weight: If true, the weight bounds are used. (default: False)
+        @param penalties: The penalties for each node. (default: None)
+        """
         self.num_edge_walks = defaultdict(int)
         self.random_walks[seed_node] = []
         for n in range(num_random_walks):
@@ -142,6 +186,10 @@ class RandomWalks:
         return node in self.random_walks
 
     def get_total_hits(self, seed_node: int, target_node: int) -> float:
+        """Get number of times the target node was visited in the run.
+        @param seed_node: The seed node.
+        @param target_node: The target node.
+        @return: The number of times the target node was visited."""
         if seed_node == target_node:
             return self.number_of_walks[seed_node]
         return self.counters[seed_node].get(target_node, 0)
@@ -150,7 +198,10 @@ class RandomWalks:
         return sum(self.counters[seed_node].values())
 
     def get_number_of_hits(self, seed_node: int, target_node: int) -> float:
-        # number of hits
+        """Get number of walks that hit the target node.
+        @param seed_node: The seed node.
+        @param target_node: The target node.
+        @return: Number of hits of target node."""
         if seed_node == target_node:
             return self.number_of_walks[seed_node]
         return self.hits[seed_node].get(target_node, 0)
