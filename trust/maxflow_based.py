@@ -1,24 +1,53 @@
 """
-The code in this file is an implementation of the BarterCast Algorithm
+The code in this file is an implementation of the MaxFlow-Based Trust Functions.
 used as a reputation mechanism in P2P networks.
 """
+import igraph as ig
 import networkx as nx
 import numpy as np
 
-import igraph as ig
-
 from typing import Union
+
+
+class MaxFlow:
+
+    def __init__(self, graph: nx.DiGraph, alpha: float = 1.0) -> None:
+        """Maxflow score trust function. Uses networkx's maxflow implementation
+        https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.flow.maximum_flow.html.
+        @param graph: networkx directed graph
+        @param alpha: weight of maxflow score
+        """
+        self.alpha = alpha
+        self.graph = graph
+
+    def compute(self, seed_node: int, target_node: int) -> float:
+        """Compute maxflow score of target node from perspective of seed_node.
+        @param seed_node: seed node id in a graph (int)
+        @param target_node: target node id in a graph (int)
+        @return: maxflow score of paths from seed_node to target_node
+        """
+        if seed_node == target_node:
+            return 1.0
+        maxflow_seed_target = nx.maximum_flow_value(self.graph, seed_node, target_node, capacity='weight')
+        return maxflow_seed_target * self.alpha
 
 
 class BarterCast:
 
     def __init__(self, graph: Union[nx.Graph, ig.Graph], use_igraph: bool = False) -> None:
+        """Bartercast score trust function. https://ieeexplore.ieee.org/document/5160954
+        @param graph: networkx graph or igraph graph
+        @param use_igraph: use igraph implementation of maxflow (default: False).
+        """
         self.graph = graph
-
         self.use_igraph = use_igraph
 
     def compute(self, seed_node: int, target_node: int) -> float:
-        """Compute bartercast score of target node from perspective of seed_node"""
+        """Compute bartercast score of target node from perspective of seed_node.
+        @param seed_node: seed node id in a graph (int)
+        @param target_node: target node id in a graph (int)
+        @return: bartercast score of paths from seed_node to target_node
+        """
         if seed_node == target_node:
             return 1.0
         if self.use_igraph:
@@ -31,28 +60,23 @@ class BarterCast:
         return values
 
 
-class MaxFlow:
-
-    def __init__(self, graph: nx.DiGraph, alpha: float = 1.0) -> None:
-        self.alpha = alpha
-        self.graph = graph
-
-    def compute(self, seed_node: int, target_node: int) -> float:
-        """Compute bartercast score of target node from perspective of seed_node"""
-        if seed_node == target_node:
-            return 1.0
-        maxflow_seed_target = nx.maximum_flow_value(self.graph, seed_node, target_node, capacity='weight')
-        return maxflow_seed_target * self.alpha
-
-
 class RawBarterCast:
 
     def __init__(self, graph: nx.DiGraph, alpha: float = 1.0) -> None:
+        """A modification of Bartercast score trust function without arctan.
+        Score = maxflow_seed_target - maxflow_target_seed.
+        @param graph: networkx directed graph
+        @param alpha: weight of bartercast score
+        """
         self.alpha = alpha
         self.graph = graph
 
     def compute(self, seed_node: int, target_node: int) -> float:
-        """Compute bartercast score of target node from perspective of seed_node"""
+        """Compute bartercast score of target node from perspective of seed_node
+        @param seed_node: seed node id in a graph (int)
+        @param target_node: target node id in a graph (int)
+        @return: bartercast score of paths from seed_node to target_node
+        """
         if seed_node == target_node:
             return 1.0
         maxflow_seed_target = nx.maximum_flow(self.graph, seed_node, target_node, capacity='weight')[0]
@@ -63,7 +87,16 @@ class RawBarterCast:
 
 class BoundedBarterCast:
 
-    def __init__(self, graph: Union[nx.DiGraph, ig.Graph], alpha: float = 1.0, use_igraph: bool = False) -> None:
+    def __init__(self, graph: Union[nx.DiGraph, ig.Graph], 
+                    alpha: float = 1.0, 
+                    use_igraph: bool = False, 
+                    bound: float = 1000) -> None:
+        """A modification of Bartercast score trust weighted by the net contribution of the target node and seed node.
+        @param graph: networkx directed graph or igraph graph
+        @param alpha: weight of bartercast score
+        @param use_igraph: use igraph implementation of maxflow (default: False).
+        @param bound: bound of net contribution of a node (default: 1000)
+        """
         self.alpha = alpha
         self.graph = graph
 
@@ -72,7 +105,11 @@ class BoundedBarterCast:
         self.scores = {}
 
     def net_contrib(self, node: int) -> float:
-
+        """Compute net contribution of a node.
+        score = min(alpha * out_degree(node) + 1 - in_degree(node), 1000)
+        @param node: node id in a graph (int)
+        @return: net contribution of a node
+        """
         if self.use_igraph:
             out_deg = self.graph.strength(node, mode='OUT', weights='weight')
             in_deg = self.graph.strength(node, mode='IN', weights='weight')
@@ -98,7 +135,10 @@ class BoundedBarterCast:
         return self.scores[seed_node][target_node]
 
     def compute(self, seed_node: int, target_node: int) -> float:
-        """Compute bartercast score of target node from perspective of seed_node"""
+        """Compute score of target node from perspective of seed_node.
+        @param seed_node: seed node id in a graph (int)
+        @param target_node: target node id in a graph (int)
+        @return: trust score of target node from perspective of seed_node"""
         if seed_node == target_node:
             return 1.0
         p1 = 0.0
@@ -117,6 +157,13 @@ class BoundedBarterCast:
 class PenaltyCast:
 
     def __init__(self, graph: nx.DiGraph, alpha: float = 2.0) -> None:
+        """A modification of Bartercast score trust function with penalty.
+        Score = maxflow_seed_target - maxflow_target_seed.
+        Two maxflows are computed: one from seed_node to target_node and one from target_node to seed_node.
+        The penalty is computed as the difference between the two maxflows.
+        @param graph: networkx directed graph
+        @param alpha: weight of bartercast score
+        """
         self.graph = graph
 
         self.scores = {}
@@ -191,7 +238,11 @@ class PenaltyCast:
         return self.aux_scores[seed_node][target_node]
 
     def compute(self, seed_node: int, target_node: int) -> float:
-        """Compute bartercast score of target node from perspective of seed_node"""
+        """Compute score of target node from perspective of seed_node
+        @param seed_node: seed node id in a graph (int)
+        @param target_node: target node id in a graph (int)
+        @return: score of target node from perspective of seed_node
+        """
         if seed_node == target_node:
             return 1.0
         maxflow_target_seed = self.calc(target_node, seed_node)
