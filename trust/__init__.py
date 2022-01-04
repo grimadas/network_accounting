@@ -2,7 +2,6 @@ from .maxflow_based import BarterCast, RawBarterCast, PenaltyCast, BoundedBarter
 from .hitting_time import PersonalizedHittingTime, BiasedPHT
 from .maxflow_based import Netflow
 from .pagerank import PersonalizedPageRank
-from .connectivity import LocalConnectivity
 from .pagerank import TrustRank
 from .random_walks import RandomWalks, BiasStrategies
 from .pagerank import ReciprocalScaledPageRank, SBPPageRank, WBPPageRank
