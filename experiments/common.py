@@ -1,7 +1,10 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import numpy as np
 
+import collections
 from random import choice, randint
+from typing import List
 
 from p2psimpy.config import Config, Dist
 from p2psimpy.consts import MBit
@@ -47,6 +50,8 @@ def prepare_topology(num_peers=25, frac_selfish=1, num_clients=1):
     nx.set_node_attributes(G, types_map , 'type')
     return G
 
+# Visualization routines 
+
 def visualize_peer_client_network(G):
     plt.figure(figsize=(10,10))
 
@@ -81,3 +86,53 @@ def visualize_peer_client_network(G):
     nx.draw_networkx_edges(G, pos,
                            edgelist=G.edges(nbunch=client_nodes),
                            style='dotted')
+
+def draw_distribution(dist: list) -> None:
+    degreeCount = collections.Counter(dist)
+    deg, cnt = zip(*degreeCount.items())
+
+    print(np.var(dist), np.median(dist))
+    fig, ax = plt.subplots()
+    plt.bar(deg, cnt, color="b")
+
+    plt.title("Degree Histogram")
+    plt.ylabel("Count")
+    plt.xlabel("Degree");
+    
+def draw_degree_dist(G: nx.Graph) -> None:
+    degree_sequence = sorted([d for n, d in G.degree()], reverse=True)  # degree sequence
+    draw_distribution(degree_sequence)   
+
+
+# Generate work network topology
+def generate_work_graph_power_law(N: int, **kwargs):
+    alpha = kwargs.get('alpha', 0.4)
+    beta = kwargs.get('beta', 0.5)
+    gamma = kwargs.get('gamma', 0.1)
+    delta_in = kwargs.get('delta_in', 0.2)
+    delta_out = kwargs.get('delta_in', 0)
+    seed = kwargs.get('seed', None)
+
+    G =  nx.scale_free_graph(N*3, alpha=alpha, beta=beta, gamma=gamma, 
+                             delta_in=delta_in, delta_out=delta_out, seed=seed)
+    G1 = nx.DiGraph()
+    for u,v,data in G.edges(data=True):
+        if u != v:
+            if u > N-1:
+                u = u % N
+            if v > N-1:
+                v = v % N
+            w = data['weight'] if 'weight' in data else 1.0
+            if G1.has_edge(u,v):
+                G1[u][v]['weight'] += w
+            else:
+                G1.add_edge(u, v, weight=w)
+    return G1
+
+def generate_work_graph_uniform(N: int, p: float = 0.1, rand_dist: Dist = 'uniform', rand_params: List[float] = [1, 14]):
+    G1 = nx.gnp_random_graph(N, p, directed=True)
+    d = Dist(rand_dist, rand_params)
+    for (u, v) in G1.edges():
+        G1.edges[u,v]['weight'] = d.get()
+    return G1
+ 
