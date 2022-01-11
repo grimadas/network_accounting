@@ -1,6 +1,8 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns   
+from scipy.stats import rankdata
 
 import collections
 from random import choice, randint
@@ -102,6 +104,20 @@ def draw_distribution(dist: list) -> None:
 def draw_degree_dist(G: nx.Graph) -> None:
     degree_sequence = sorted([d for n, d in G.degree()], reverse=True)  # degree sequence
     draw_distribution(degree_sequence)   
+
+def draw_rank_vals(x, r, title, log_val = 'symlog', ylim = (None, None), xlim=(None, None)) -> None:
+    g = sns.lineplot(list(r.values()), list(x.values()))
+    g.axhline(0, ls='--')
+
+    g.set_xscale('log')
+    g.set_yscale(log_val)
+    g.set(ylim=ylim, xlim=xlim)
+    g.set(ylabel='Contribution value', xlabel='Peer ranking', title=title);
+    
+    return g
+
+def rank_vals(x_val):
+    return dict(zip(x_val.keys(), rankdata([-i for i in x_val.values()], method='min')))  
 
 
 # Generate work network topology
